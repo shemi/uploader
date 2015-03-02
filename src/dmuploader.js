@@ -16,11 +16,11 @@
     method: 'POST',
     extraData: {},
     maxFileSize: 0,
-    maxFiles: 0,
     allowedTypes: '*',
     extFilter: null,
     dataType: null,
     fileName: 'file',
+    startOnSubmit: false,
     onInit: function(){},
     onFallbackMode: function() {message},
     onNewFile: function(id, file){},
@@ -31,8 +31,7 @@
     onUploadError: function(id, message){},
     onFileTypeError: function(file){},
     onFileSizeError: function(file){},
-    onFileExtError: function(file){},
-    onFilesMaxError: function(file){}
+    onFileExtError: function(file){}
   };
 
   var DmUploader = function(element, options)
@@ -114,15 +113,21 @@
     });
 
     //-- Optional File input to make a clickable area
-    widget.element.find('input[type=file]').on('change', function(evt){
-      var files = evt.target.files;
-
-      widget.queueFiles(files);
-
-      $(this).val('');
-    });
-        
-    this.settings.onInit.call(this.element);
+    if(!this.settings.startOnSubmit){
+        widget.element.find('input[type=file]').on('change', function(evt){
+            var files = evt.target.files;
+            widget.queueFiles(files);
+            $(this).val('');
+        });
+        this.settings.onInit.call(this.element);
+    } else {
+        widget.element.on('submit', function(evt){
+            var files = $(this).find('input[type=file]').get(0).files;
+            widget.queueFiles(files);
+            $(this).find('input[type=file]').val('');
+        });
+        this.settings.onInit.call(this.element);
+    }
   };
 
   DmUploader.prototype.queueFiles = function(files)
@@ -163,15 +168,6 @@
           continue;
         }
       }
-            
-      // Check max files
-      if(this.settings.maxFiles > 0) {
-        if(this.queue.length >= this.settings.maxFiles) {
-          this.settings.onFilesMaxError.call(this.element, file);
-
-          continue;
-        }
-      }
 
       this.queue.push(file);
 
@@ -185,7 +181,7 @@
       return false;
     }
 
-    // and only if new Failes were successfully added
+    // and only if new Files were succefully added
     if(this.queue.length == j){
       return false;
     }
@@ -220,23 +216,18 @@
     var fd = new FormData();
     fd.append(widget.settings.fileName, file);
 
-    // Return from client function (default === undefined)
-    var can_continue = widget.settings.onBeforeUpload.call(widget.element, widget.queuePos);
-    
-    // If the client function doesn't return FALSE then continue
-    if( false === can_continue ) {
-      return;
-    }
-
     // Append extra Form Data
     $.each(widget.settings.extraData, function(exKey, exVal){
       fd.append(exKey, exVal);
     });
 
+    widget.settings.onBeforeUpload.call(widget.element, widget.queuePos);
+
     widget.queueRunning = true;
 
     // Ajax Submit
     $.ajax({
+
       url: widget.settings.url,
       type: widget.settings.method,
       dataType: widget.settings.dataType,
